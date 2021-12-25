@@ -1,48 +1,19 @@
 import * as React from 'react';
-import {useState} from 'react';
+import {useState, useMemo} from 'react';
 import {render} from 'react-dom';
-import MapGL, {
+import {
+  MapGL,
   Popup,
-  NavigationControl,
-  FullscreenControl,
-  ScaleControl,
-  GeolocateControl
-} from 'react-map-gl';
-
-import ControlPanel from './control-panel';
-import Pins from './pins';
-import CityInfo from './city-info';
+  Marker,
+  NavigationControl
+} from './react-map-gl';
 
 import CITIES from '../../.data/cities.json';
 
 const TOKEN = ''; // Set your mapbox token here
 
-const geolocateStyle = {
-  top: 0,
-  left: 0,
-  padding: '10px'
-};
-
-const fullscreenControlStyle = {
-  top: 36,
-  left: 0,
-  padding: '10px'
-};
-
-const navStyle = {
-  top: 72,
-  left: 0,
-  padding: '10px'
-};
-
-const scaleControlStyle = {
-  bottom: 36,
-  left: 0,
-  padding: '10px'
-};
-
 export default function App() {
-  const [viewport, setViewport] = useState({
+  const [viewState, setViewState] = useState({
     latitude: 40,
     longitude: -100,
     zoom: 3.5,
@@ -51,39 +22,61 @@ export default function App() {
   });
   const [popupInfo, setPopupInfo] = useState(null);
 
-  return (
-    <>
-      <MapGL
-        {...viewport}
-        width="100%"
-        height="100%"
-        mapStyle="mapbox://styles/mapbox/dark-v9"
-        onViewportChange={setViewport}
-        mapboxApiAccessToken={TOKEN}
+  const pins = useMemo(() => CITIES.map((city, index) => (
+    <Marker key={`marker-${index}`}
+      longitude={city.longitude}
+      latitude={city.latitude}
+      draggable
+      anchor="bottom">
+      <svg
+        height={20}
+        viewBox="0 0 24 24"
+        style={{
+          cursor: 'pointer',
+          fill: '#d00',
+          stroke: 'none',
+        }}
+        onClick={() => setPopupInfo(city)}
       >
-        <Pins data={CITIES} onClick={setPopupInfo} />
+        <path d="M20.2,15.7L20.2,15.7c1.1-1.6,1.8-3.6,1.8-5.7c0-5.6-4.5-10-10-10S2,4.5,2,10c0,2,0.6,3.9,1.6,5.4c0,0.1,0.1,0.2,0.2,0.3
+  c0,0,0.1,0.1,0.1,0.2c0.2,0.3,0.4,0.6,0.7,0.9c2.6,3.1,7.4,7.6,7.4,7.6s4.8-4.5,7.4-7.5c0.2-0.3,0.5-0.6,0.7-0.9
+  C20.1,15.8,20.2,15.8,20.2,15.7z" />
+      </svg>
+    </Marker>
+  )), []);
 
-        {popupInfo && (
-          <Popup
-            tipSize={5}
-            anchor="top"
-            longitude={popupInfo.longitude}
-            latitude={popupInfo.latitude}
-            closeOnClick={false}
-            onClose={setPopupInfo}
-          >
-            <CityInfo info={popupInfo} />
-          </Popup>
-        )}
+  return (
+    <MapGL
+      initialViewState={viewState}
+      mapStyle="mapbox://styles/mapbox/dark-v9"
+      mapboxAccessToken={TOKEN}
+    >
+      <NavigationControl />
 
-        <GeolocateControl style={geolocateStyle} />
-        <FullscreenControl style={fullscreenControlStyle} />
-        <NavigationControl style={navStyle} />
-        <ScaleControl style={scaleControlStyle} />
-      </MapGL>
+      {pins}
 
-      <ControlPanel />
-    </>
+      {popupInfo && (
+        <Popup
+          tipSize={5}
+          anchor="top"
+          longitude={popupInfo.longitude}
+          latitude={popupInfo.latitude}
+          closeOnClick={false}
+          onClose={() => setPopupInfo(null)}
+        >
+          <div>
+            {popupInfo.city}, {popupInfo.state} |{' '}
+            <a
+              target="_new"
+              href={`http://en.wikipedia.org/w/index.php?title=Special:Search&search=${popupInfo.city}, ${popupInfo.state}`}
+            >
+              Wikipedia
+            </a>
+          </div>
+          <img width="100%" src={popupInfo.image} />
+        </Popup>
+      )}
+    </MapGL>
   );
 }
 
