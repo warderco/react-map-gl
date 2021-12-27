@@ -1,36 +1,41 @@
 const webpack = require('webpack');
-const getWebpackConfig = require('ocular-dev-tools/config/webpack.config');
 
-const BABEL_CONFIG = {
-  presets: ['@babel/env', '@babel/react'],
-  plugins: ['version-inline', '@babel/proposal-class-properties']
-};
+module.exports = {
+  mode: 'development',
 
-module.exports = env => {
-  const config = getWebpackConfig(env);
+  entry: {
+    app: './src/app.tsx'
+  },
 
-  config.module.rules.push({
-    // This is required to handle inline worker!
-    test: /\.js$/,
-    exclude: /node_modules/,
-    use: [
+  output: {
+    library: 'App'
+  },
+
+  resolve: {
+    extensions: ['.ts', '.tsx', '.js', '.json']
+  },
+
+  module: {
+    rules: [
       {
-        loader: 'babel-loader',
-        options: BABEL_CONFIG
+        test: /\.(ts|js)x?$/,
+        exclude: [/node_modules/],
+        use: [
+          {
+            loader: 'babel-loader',
+            options: {
+              presets: ['@babel/env', '@babel/react'],
+              plugins: ['@babel/proposal-class-properties']
+            }
+          },
+          {
+            loader: 'ts-loader'
+          }
+        ]
       }
     ]
-  });
+  },
 
-  config.plugins = (config.plugins || []).concat([
-    new webpack.DefinePlugin({
-      __MAPBOX_TOKEN__: JSON.stringify(process.env.MapboxAccessToken) // eslint-disable-line
-    })
-  ]);
-
-  if (env.mode === 'size') {
-    // Only measure self bundle size
-    config.externals = ['mapbox-gl'];
-  }
-
-  return config;
+  // Optional: Enables reading mapbox token from environment variable
+  plugins: [new webpack.EnvironmentPlugin(['MapboxAccessToken'])]
 };
