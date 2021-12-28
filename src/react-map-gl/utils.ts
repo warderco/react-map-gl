@@ -1,6 +1,6 @@
-import mapboxgl from 'mapbox-gl';
+import mapboxgl from './mapbox-gl';
 
-import type {PaddingOptions} from 'mapbox-gl';
+import type {PaddingOptions, PointLike} from 'mapbox-gl';
 
 export type ViewState = {
   longitude?: number,
@@ -24,6 +24,14 @@ export type Transform = {
   resize: (width: number, height: number) => void,
   isPaddingEqual: (value: PaddingOptions) => boolean
 };
+
+export function arePointsEqual(a?: PointLike, b?: PointLike): boolean {
+  const ax = Array.isArray(a) ? a[0] : (a ? a.x : 0);
+  const ay = Array.isArray(a) ? a[1] : (a ? a.y : 0);
+  const bx = Array.isArray(b) ? b[0] : (b ? b.x : 0);
+  const by = Array.isArray(b) ? b[1] : (b ? b.y : 0);
+  return ax === bx && ay === by;
+}
 
 export function deepEqual(a: any, b: any): boolean {
   if (a === b) {

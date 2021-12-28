@@ -37,7 +37,7 @@ const defaultProps: MapProps = {
 };
 
 export default function Map(props: MapProps) {
-  const [mapInstance, setMapInstance] = useState(null);
+  const [mapInstance, setMapInstance] = useState<Mapbox>(null);
   const containerRef = useRef();
 
   useEffect(() => {
@@ -63,7 +63,7 @@ export default function Map(props: MapProps) {
   return (
     <div id={props.id} ref={containerRef} style={style}>
       {mapInstance && <MapContext.Provider value={{
-        map: mapInstance.map
+        map: mapInstance.getMap()
       }}>
         {props.children}
       </MapContext.Provider>}

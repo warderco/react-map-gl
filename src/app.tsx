@@ -51,6 +51,7 @@ export default function App() {
       viewState={viewState}
       onClick={console.log}
       onMove={({ viewState }) => setViewState(viewState)}
+      // onMove={({ viewState }) => requestAnimationFrame(() => setViewState(viewState))}
       mapStyle="mapbox://styles/mapbox/dark-v9"
       mapboxAccessToken={TOKEN}
     >

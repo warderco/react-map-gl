@@ -12,7 +12,10 @@ module.exports = {
   },
 
   resolve: {
-    extensions: ['.ts', '.tsx', '.js', '.json']
+    extensions: ['.ts', '.tsx', '.js', '.json'],
+    alias: {
+      'mapbox-gl': require('path').resolve('./node_modules/mapbox-gl/dist/mapbox-gl-dev.js')
+    }
   },
 
   module: {

@@ -1,4 +1,4 @@
-import mapboxgl from 'mapbox-gl';
+import mapboxgl from './mapbox-gl';
 import {
   ViewState,
   Transform,
@@ -167,26 +167,33 @@ const handlerNames: (keyof MapboxProps)[] = [
 
 export default class Mapbox {
   // mapboxgl.Map instance
-  map: any = null;
+  private _map: any = null;
   // User props
   props: MapboxProps;
 
-  // Mapbox map is stateful and map.transform tracks its view states
-  // During method calls/user interactions, the transform is constantly mutated
-  // In order to control the map with React props, we swap out the transform
-  // with the one below during event callbacks and each render frame
-  // This one always reflects the correct view state as user-supplied props
-  // override the underlying state
+  // Mapbox map is stateful.
+  // During method calls/user interactions, map.transform is mutated and
+  // deviate from user-supplied props.
+  // In order to control the map reactively, we shadow the transform
+  // with the one below, which reflects the view state resolved from
+  // both user-supplied props and the underlying state
   private _renderTransform: Transform;
   
   // Internal states
-  private _isDirty: boolean = false;
-  private _updating: boolean = false;
+  private _internalUpdate: boolean = false;
   private _inRender: boolean = false;
+  private _moved: boolean = false;
+  private _zoomed: boolean = false;
+  private _pitched: boolean = false;
+  private _rotated: boolean = false;
   private _nextProps: MapboxProps | null;
 
   constructor(props: MapboxProps) {
     this.props = props;
+  }
+
+  getMap() {
+    return this._map;
   }
 
   setProps(props: MapboxProps) {
@@ -200,16 +207,16 @@ export default class Mapbox {
 
     const settingsChanged = this._updateSettings(props, oldProps);
     if (settingsChanged) {
-      this._renderTransform = this.map.transform.clone();
+      this._renderTransform = this._map.transform.clone();
     }
-    const viewStateChanged = this._updateViewState(props);
+    const viewStateChanged = this._updateViewState(props, true);
     this._updateStyle(props, oldProps);
     this._updateHandlers(props, oldProps);
 
     // If 1) view state has changed to match props and
-    //    2) the props change is not triggered by map interaction,
-    // it's likely driven by an external state change. Redraw immediately
-    if (settingsChanged || (viewStateChanged && this._isDirty)) {
+    //    2) the props change is not triggered by map events,
+    // it's driven by an external state change. Redraw immediately
+    if (settingsChanged || (viewStateChanged && !this._map.isMoving())) {
       this.redraw();
     }
   }
@@ -260,18 +267,18 @@ export default class Mapbox {
     for (const eventName in lifeCycleEvents) {
       map.on(eventName, this._onLifeCycleEvent);
     }
-    this.map = map;
+    this._map = map;
   }
 
   destroy() {
-    this.map.remove();
+    this._map.remove();
   }
 
   // Force redraw the map now. Typically resize() and jumpTo() is reflected in the next
   // render cycle, which is managed by Mapbox's animation loop.
   // This removes the synchronization issue caused by requestAnimationFrame.
   redraw() {
-    const {map} = this;
+    const map = this._map;
     // map._render will throw error if style does not exist
     // https://github.com/mapbox/mapbox-gl-js/blob/fb9fc316da14e99ff4368f3e4faa3888fb43c513
     //   /src/ui/map.js#L1834
@@ -289,34 +296,35 @@ export default class Mapbox {
   // Adapted from map.jumpTo
   /* Update camera to match props
      @param {object} nextProps
-     @param {object} currProps
+     @param {bool} triggerEvents - should fire camera events
      @returns {bool} true if anything is changed
    */
-  _updateViewState(nextProps: MapboxProps): boolean {
-    const {map} = this;
-    const tr = map.transform;
-    // About to mutate the transform, take a snapshot of its state
-    const fromViewState = transformToViewState(tr);
-    const changed = applyViewStateToTransform(tr, nextProps);
+  _updateViewState(nextProps: MapboxProps, triggerEvents: boolean): boolean {
+    if (this._internalUpdate) {
+      return;
+    }
+    const map = this._map;
 
-    if (changed) {
-      this._updating = true;
-      map.fire('movestart').fire('move');
+    const tr = this._renderTransform;
+    // Take a snapshot of the transform before mutation
+    const {zoom, pitch, bearing} = tr;
+    const changed = applyViewStateToTransform(tr, {
+      ...transformToViewState(map.transform),
+      ...nextProps
+    });
 
-      if (fromViewState.zoom !== tr.zoom) {
-        map.fire('zoomstart').fire('zoom').fire('zoomend');
-      }
+    if (changed && triggerEvents) {
+      // Delay DOM control updates to the next render cycle
+      this._moved = true;
+      this._zoomed = this._zoomed || zoom !== tr.zoom;
+      this._rotated = this._rotated || bearing !== tr.bearing;
+      this._pitched = this._pitched || pitch !== tr.pitch;
+    }
 
-      if (fromViewState.bearing !== tr.bearing) {
-        map.fire('rotatestart').fire('rotate').fire('rotateend');
-      }
-
-      if (fromViewState.pitch !== tr.pitch) {
-        map.fire('pitchstart').fire('pitch').fire('pitchend');
-      }
-
-      map.fire('moveend');
-      this._updating = false;
+    // Avoid manipulating the real transform when interaction/animation is ongoing
+    // as it would interfere with Mapbox's handlers
+    if (!map.isMoving()) {
+      applyViewStateToTransform(map.transform, nextProps);
     }
 
     return changed;
@@ -328,7 +336,7 @@ export default class Mapbox {
      @returns {bool} true if anything is changed
    */
   _updateSettings(nextProps: MapboxProps, currProps: MapboxProps): boolean {
-    const {map} = this;
+    const map = this._map;
     let changed = false;
     for (const propName of settingNames) {
       if (!deepEqual(nextProps[propName], currProps[propName])) {
@@ -349,7 +357,7 @@ export default class Mapbox {
       const options = {
         diff: nextProps.styleDiffing,
       };
-      this.map.setStyle(nextProps.mapStyle, options);
+      this._map.setStyle(nextProps.mapStyle, options);
       return true;
     }
     return false;
@@ -361,7 +369,7 @@ export default class Mapbox {
      @returns {bool} true if anything is changed
    */
   _updateHandlers(nextProps: MapboxProps, currProps: MapboxProps): boolean {
-    const { map } = this;
+    const map = this._map;
     let changed = false;
     for (const propName of handlerNames) {
       const newValue = nextProps[propName];
@@ -390,7 +398,7 @@ export default class Mapbox {
     const cb = this.props[pointerEvents[e.type]];
     if (cb) {
       if (this.props.interactiveLayerIds) {
-        e.features = this.map.queryRenderedFeatures(e.point, {
+        e.features = this._map.queryRenderedFeatures(e.point, {
           layers: this.props.interactiveLayerIds
         });
       }
@@ -399,7 +407,7 @@ export default class Mapbox {
   }
 
   _onCameraEvent = (e: MapboxEvent) => {
-    if (this._updating) {
+    if (this._internalUpdate) {
       return;
     }
     // @ts-ignore
@@ -410,7 +418,7 @@ export default class Mapbox {
   }
 
   _fireEvent(baseFire: Function, event: string | MapboxEvent, properties?: object) {
-    const map = this.map;
+    const map = this._map;
     const tr = map.transform;
 
     const eventType = typeof event === 'string' ? event : event.type;
@@ -420,12 +428,7 @@ export default class Mapbox {
         break;
       
       case 'move':
-      case 'movestart':
-        const changed = applyViewStateToTransform(this._renderTransform, {
-          ...transformToViewState(tr),
-          ...this.props
-        });
-        this._isDirty = this._isDirty || changed;
+        this._updateViewState(this.props, false);
         break;
     }
     if (typeof event === 'object' && event.type in cameraEvents) {
@@ -440,14 +443,37 @@ export default class Mapbox {
   }
 
   _render(baseRender: Function, arg: number) {
-    const map = this.map;
+    const map = this._map;
     this._inRender = true;
+
+    if (this._moved) {
+      this._internalUpdate = true;
+      map.fire('move');
+
+      if (this._zoomed) {
+        map.fire('zoom');
+        this._zoomed = false;
+      }
+
+      if (this._rotated) {
+        map.fire('rotate');
+        this._rotated = false;
+      }
+
+      if (this._pitched) {
+        map.fire('pitch');
+        this._pitched = false;
+      }
+
+      this._moved = false;
+      this._internalUpdate = false;
+    }
+
     // map.transform will be swapped out in _onBeforeRender
     const tr = map.transform;
     baseRender.call(map, arg);
     map.transform = tr;
     this._inRender = false;
-    this._isDirty = false;
 
     // We do not allow props to change during a render
     // When render is done, apply any pending changes
@@ -459,7 +485,7 @@ export default class Mapbox {
 
   _onBeforeRepaint() {
     // Make sure camera matches the current props
-    this.map.transform = this._renderTransform;
+    this._map.transform = this._renderTransform;
   };
 }
 

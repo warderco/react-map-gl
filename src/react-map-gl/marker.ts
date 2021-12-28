@@ -1,11 +1,12 @@
 import * as React from 'react';
 import { createPortal } from 'react-dom';
-import { useEffect, useState, useRef, useContext } from 'react';
+import { useEffect, useState, useMemo, useRef, useContext } from 'react';
 
-import mapboxgl from 'mapbox-gl';
+import mapboxgl from './mapbox-gl';
 import type {MarkerOptions, MapboxEvent} from 'mapbox-gl';
 
 import MapContext from './map-context';
+import {arePointsEqual} from './utils';
 
 export type MarkerProps = Omit<MarkerOptions, 'element'> & {
   longitude: number,
@@ -14,6 +15,13 @@ export type MarkerProps = Omit<MarkerOptions, 'element'> & {
   onDrag?: (e: MapboxEvent) => void,
   onDragEnd?: (e: MapboxEvent) => void,
   children?: React.ReactNode
+};
+
+const defaultProps: Partial<MarkerProps> = {
+  draggable: false,
+  rotation: 0,
+  rotationAlignment: 'auto',
+  pitchAlignment: 'auto'
 };
 
 function Marker(props: MarkerProps) {
@@ -53,16 +61,28 @@ function Marker(props: MarkerProps) {
     }
   }, []);
 
-  marker.setLngLat([props.longitude, props.latitude]);
-  if (props.offset) {
+  if (marker.getLngLat().lng !== props.longitude || marker.getLngLat().lat !== props.latitude) {
+    marker.setLngLat([props.longitude, props.latitude]);
+  }
+  if (props.offset && !arePointsEqual(marker.getOffset(), props.offset)) {
     marker.setOffset(props.offset);
   }
-  marker.setDraggable(props.draggable);
-  marker.setRotation(props.rotation);
-  marker.setRotationAlignment(props.rotationAlignment);
-  marker.setPitchAlignment(props.pitchAlignment);
+  if (marker.isDraggable() !== props.draggable) {
+    marker.setDraggable(props.draggable);
+  }
+  if (marker.getRotation() !== props.rotation){
+    marker.setRotation(props.rotation);
+  }
+  if (marker.getRotationAlignment() !== props.rotationAlignment) {
+    marker.setRotationAlignment(props.rotationAlignment);
+  }
+  if (marker.getPitchAlignment() !== props.pitchAlignment) {
+    marker.setPitchAlignment(props.pitchAlignment);
+  }
 
   return createPortal(props.children, marker.getElement());
 }
+
+Marker.defaultProps = defaultProps;
 
 export default React.memo(Marker);

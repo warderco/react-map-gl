@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useEffect, useContext } from 'react';
 
-import mapboxgl from 'mapbox-gl';
+import mapboxgl from './mapbox-gl';
 
 import MapContext from './map-context';
 
