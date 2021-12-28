@@ -7,3 +7,4 @@ export { default as Popup, PopupProps } from './popup';
 export { default as NavigationControl, NavigationControlProps } from './navigation-control';
 
 export {ViewState} from './utils';
+export {default as useControl} from './use-control';

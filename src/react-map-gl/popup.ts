@@ -17,7 +17,7 @@ export type PopupProps = PopupOptions & {
 };
 
 function Popup(props: PopupProps) {
-  const context = useContext(MapContext);
+  const map = useContext(MapContext);
   const [container] = useState(() => {
     return document.createElement('div');
   });
@@ -26,7 +26,7 @@ function Popup(props: PopupProps) {
     return new mapboxgl.Popup(options)
       .setLngLat([props.longitude, props.latitude])
       .setDOMContent(container)
-      .addTo(context.map);
+      .addTo(map);
   });
   const thisRef = useRef({props});
   thisRef.current.props = props;

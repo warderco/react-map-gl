@@ -62,9 +62,7 @@ export default function Map(props: MapProps) {
 
   return (
     <div id={props.id} ref={containerRef} style={style}>
-      {mapInstance && <MapContext.Provider value={{
-        map: mapInstance.getMap()
-      }}>
+      {mapInstance && <MapContext.Provider value={mapInstance.getMap()}>
         {props.children}
       </MapContext.Provider>}
     </div>

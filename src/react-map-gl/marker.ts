@@ -25,7 +25,7 @@ const defaultProps: Partial<MarkerProps> = {
 };
 
 function Marker(props: MarkerProps) {
-  const context = useContext(MapContext);
+  const map = useContext(MapContext);
   const [marker] = useState(() => {
     let hasChildren = false;
     React.Children.forEach(props.children, el => {
@@ -40,7 +40,7 @@ function Marker(props: MarkerProps) {
 
     return new mapboxgl.Marker(options)
       .setLngLat([props.longitude, props.latitude])
-      .addTo(context.map);
+      .addTo(map);
   });
   const thisRef = useRef({props});
   thisRef.current.props = props;
