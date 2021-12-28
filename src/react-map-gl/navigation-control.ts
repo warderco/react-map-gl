@@ -1,9 +1,6 @@
 import * as React from 'react';
-import { useEffect, useContext } from 'react';
-
 import mapboxgl from './mapbox-gl';
-
-import MapContext from './map-context';
+import useControl from './use-control';
 
 export type NavigationControlProps = {
   showCompass?: boolean,
@@ -13,17 +10,8 @@ export type NavigationControlProps = {
 };
 
 function NavigationControl(props: NavigationControlProps): null {
-  const context = useContext(MapContext);
+  const ctrl = useControl(() => new mapboxgl.NavigationControl(props), props.position);
 
-  useEffect(() => {
-    const ctrl = new mapboxgl.NavigationControl({ ...props });
-    context.map.addControl(ctrl, props.position);
-
-    return () => {
-      context.map.removeControl(ctrl);
-    };
-  }, [])
-  
   return null;
 }
 
